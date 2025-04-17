@@ -101,7 +101,7 @@ async def animate_neopixels(controls):
             animate_rainbow(controls, left, left_cfg)
             animate_rainbow(controls, right, right_cfg)
         controls.counter += controls.speed
-        await asyncio.sleep(0.1)
+        await asyncio.sleep(0)
 
 def animate_solid(controls, leds, cfg):
     start = cfg.leds_to_skip + 1
@@ -113,7 +113,7 @@ def animate_revolve(controls, leds, cfg):
     start = cfg.leds_to_skip + 1
     loop_len = cfg.leds_in_loop
     half = loop_len // 2
-    pos = controls.counter % loop_len
+    pos = (controls.counter // 2) % loop_len
 
     for i in range(loop_len):
         distance = (i - pos) % loop_len
@@ -125,7 +125,7 @@ def animate_wipe(controls, leds, cfg):
     pass
 
 def animate_rainbow(controls, leds, cfg):
-    pos = controls.counter * 4
+    pos = controls.counter
     for i in range(cfg.leds_in_loop):
         leds[cfg.leds_to_skip + 1 + i] = colorwheel(math.floor((i+pos)/cfg.leds_in_loop*255) & 255)
     leds.show()
