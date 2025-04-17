@@ -24,14 +24,28 @@ from adafruit_bluefruit_connect.packet import Packet
 from adafruit_bluefruit_connect.button_packet import ButtonPacket
 from adafruit_bluefruit_connect.color_packet import ColorPacket
 
-# Display constants
-INITIAL_BRIGHTNESS = 0.8
-BRIGHTNESS_INCREMENT = 0.2
+class Animation:
+    # The entire loop is one solid color.
+    SOLID = 1
+    # Half of the loop is on, this portion moves around the loop.
+    REVOLVE = 2
+    # LEDs individually turn on around the loop until it's entirely lit up, then similarly turn off one-by-one.
+    WIPE = 3
+    # All LEDs are on, but the colors fade around in a looping rainbow pattern.
+    RAINBOW = 4
+
+# Color constants
 RED = (255, 0, 0)
 GREEN = (0, 255, 0)
 BLUE = (0, 0, 255)
 TEAL = (0, 255, 126)
 BLACK = (0, 0, 0)
+
+# Display constants
+INITIAL_ANIMATION = Animation.REVOLVE
+INITIAL_COLOR = BLUE
+INITIAL_BRIGHTNESS = 0.8
+BRIGHTNESS_INCREMENT = 0.2
 
 class NeoPixelConfig:
     # Which pins the data lines of the NeoPixel strips are each connected to
@@ -59,20 +73,39 @@ advertisement = ProvideServicesAdvertisement(uart)
 
 class Controls:
     def __init__(self):
-        self.color = RED
+        self.animation = INITIAL_ANIMATION
+        self.color = INITIAL_COLOR
         self.brightness = INITIAL_BRIGHTNESS
+        self.counter = 0
 
 async def animate_neopixels(controls):
     while True:
-        for i in range(0, left_cfg.leds_in_loop):
-            left[left_cfg.leds_to_skip + 1 + i] = controls.color
-        for i in range(0, right_cfg.leds_in_loop):
-            right[right_cfg.leds_to_skip + 1 + i] = controls.color
         left.brightness = controls.brightness
         right.brightness = controls.brightness
-        left.show()
-        right.show()
+        if controls.animation == Animation.SOLID:
+            animate_solid(controls, left, left_cfg)
+            animate_solid(controls, right, right_cfg)
+        elif controls.animation == Animation.REVOLVE:
+            animate_revolve(controls, left, left_cfg)
+            animate_revolve(controls, right, right_cfg)
+        controls.counter += 1
         await asyncio.sleep(0.1)
+
+def animate_solid(controls, leds, cfg):
+    leds[cfg.leds_to_skip + 1 : cfg.leds_to_skip + 1 + cfg.leds_in_loop ] = [controls.color] * cfg.leds_in_loop
+    leds.show()
+
+def animate_revolve(controls, leds, cfg):
+    start = cfg.leds_to_skip + 1
+    loop_len = cfg.leds_in_loop
+    half = loop_len // 2
+    pos = controls.counter % loop_len
+
+    for i in range(loop_len):
+        distance = (i - pos) % loop_len
+        leds[start + i] = controls.color if distance < half else BLACK
+
+    leds.show()
 
 async def monitor_ble_control_pad(controls):
     while True:
