@@ -7,14 +7,18 @@ This sketch requires these libraries:
 Copy these from the lib folder of the bundle (for Version 9.x) zip obtained via https://circuitpython.org/libraries#:~:text=Bundle%20for%20Version%209.x
 
 This project uses the free Adafruit Bluefruit LE Connect App. Download and open the app, check the "Must have UART Service" filter, and tap the "Connect" button next to the one device named something like "CIRCUITPYc11325".
-Then navigate to Controller > Control Pad. Tap up or down to increase or decrease the brightness by 20% (it starts at 80%). Press 1 for red, 2 for green, 3 for blue, and 4 for teal (matches the wig).
-You can also go to Controller > Color Picker and send a custom color.
+Then navigate to Controller > Control Pad. The numbers control the animation. Press 1 for a solid color, 2 for a revolving pattern, 3 for a wiping pattern, and 4 for a rainbow swirl.
+Tap up or down to increase or decrease the brightness by 20% (it starts at 80%). Tap left or right to decrease or increase the speed (it starts at 1, and can go up to 4).
+You can go to Controller > Color Picker to set the color of animations 1-3 (it starts as red).
 When you Ctrl+S to save the sketch and reload the board, you'll need to back out two levels to the screen that says "Modules", before going into Controller > Control Pad again. You _don't_ need to Disconnect and re-Connect.
 """
+
+import math
 
 import asyncio
 import board
 import neopixel
+from rainbowio import colorwheel
 
 from adafruit_ble import BLERadio
 from adafruit_ble.advertising.standard import ProvideServicesAdvertisement
@@ -43,10 +47,10 @@ BLACK = (0, 0, 0)
 
 # Display constants
 INITIAL_ANIMATION = Animation.REVOLVE
-INITIAL_COLOR = BLUE
+INITIAL_COLOR = RED
 INITIAL_BRIGHTNESS = 0.8
 BRIGHTNESS_INCREMENT = 0.2
-ANIMATION_SPEED = 3
+ANIMATION_SPEED = 1
 
 class NeoPixelConfig:
     # Which pins the data lines of the NeoPixel strips are each connected to
@@ -90,6 +94,12 @@ async def animate_neopixels(controls):
         elif controls.animation == Animation.REVOLVE:
             animate_revolve(controls, left, left_cfg)
             animate_revolve(controls, right, right_cfg)
+        elif controls.animation == Animation.WIPE:
+            animate_wipe(controls, left, left_cfg)
+            animate_wipe(controls, right, right_cfg)
+        elif controls.animation == Animation.RAINBOW:
+            animate_rainbow(controls, left, left_cfg)
+            animate_rainbow(controls, right, right_cfg)
         controls.counter += controls.speed
         await asyncio.sleep(0.1)
 
@@ -111,6 +121,15 @@ def animate_revolve(controls, leds, cfg):
 
     leds.show()
 
+def animate_wipe(controls, leds, cfg):
+    pass
+
+def animate_rainbow(controls, leds, cfg):
+    pos = controls.counter * 4
+    for i in range(cfg.leds_in_loop):
+        leds[cfg.leds_to_skip + 1 + i] = colorwheel(math.floor((i+pos)/cfg.leds_in_loop*255) & 255)
+    leds.show()
+
 async def monitor_ble_control_pad(controls):
     while True:
         ble.start_advertising(advertisement)
@@ -126,14 +145,18 @@ async def monitor_ble_control_pad(controls):
                             controls.brightness = min(controls.brightness + BRIGHTNESS_INCREMENT, 1.0)
                         elif packet.button == ButtonPacket.DOWN:
                             controls.brightness = max(controls.brightness - BRIGHTNESS_INCREMENT, 0.0)
+                        elif packet.button == ButtonPacket.RIGHT:
+                            controls.speed = min(controls.speed + 1, 4)
+                        if packet.button == ButtonPacket.LEFT:
+                            controls.speed = max(controls.speed - 1, 1)
                         elif packet.button == ButtonPacket.BUTTON_1:
-                            controls.color = RED
+                            controls.animation = Animation.SOLID
                         elif packet.button == ButtonPacket.BUTTON_2:
-                            controls.color = GREEN
+                            controls.animation = Animation.REVOLVE
                         elif packet.button == ButtonPacket.BUTTON_3:
-                            controls.color = BLUE
+                            controls.animation = Animation.WIPE
                         elif packet.button == ButtonPacket.BUTTON_4:
-                            controls.color = TEAL
+                            controls.animation = Animation.RAINBOW
                 if isinstance(packet, ColorPacket):
                     controls.color = packet.color
             await asyncio.sleep(0)
