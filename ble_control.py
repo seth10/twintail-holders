@@ -1,5 +1,12 @@
 """
-This sketch uses the free Adafruit Bluefruit LE Connect App. Download and open the app, check the "Must have UART Service" filter, and tap the "Connect" button next to the one device named something like "CIRCUITPYc11325".
+This sketch requires these libraries:
+- adafruit_ble
+- adafruit_bluefruit_connect
+- asyncio
+- neopixel.mpy
+Copy these from the lib folder of the bundle (for Version 9.x) zip obtained via https://circuitpython.org/libraries#:~:text=Bundle%20for%20Version%209.x
+
+This project uses the free Adafruit Bluefruit LE Connect App. Download and open the app, check the "Must have UART Service" filter, and tap the "Connect" button next to the one device named something like "CIRCUITPYc11325".
 Then navigate to Controller > Control Pad. Tap up or down to increase or decrease the brightness by 20% (it starts at 80%). Press 1 for red, 2 for green, 3 for blue, and 4 for teal (matches the wig).
 You can also go to Controller > Color Picker and send a custom color.
 When you Ctrl+S to save the sketch and reload the board, you'll need to back out two levels to the screen that says "Modules", before going into Controller > Control Pad again. You _don't_ need to Disconnect and re-Connect.
