@@ -53,7 +53,7 @@ TEAL = (0, 255, 126)
 BLACK = (0, 0, 0)
 
 # Display constants
-INITIAL_ANIMATION = Animation.REVOLVE
+INITIAL_ANIMATION = Animation.WIPE
 INITIAL_COLOR = RED
 INITIAL_BRIGHTNESS = 0.8
 BRIGHTNESS_INCREMENT = 0.2
@@ -136,7 +136,16 @@ def animate_revolve(controls, leds, cfg):
     leds.show()
 
 def animate_wipe(controls, leds, cfg):
-    pass
+    start = cfg.leds_to_skip + 1
+    loop_len = cfg.leds_in_loop
+    half = loop_len // 2
+    pos = (controls.counter // 2) % (loop_len * 2)
+
+    for i in range(loop_len):
+        distance = (i + pos) % (loop_len * 2)
+        leds[start + i] = controls.color if distance > loop_len else BLACK
+
+    leds.show()
 
 def animate_rainbow(controls, leds, cfg):
     pos = controls.counter
