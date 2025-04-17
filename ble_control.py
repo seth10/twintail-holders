@@ -46,6 +46,7 @@ INITIAL_ANIMATION = Animation.REVOLVE
 INITIAL_COLOR = BLUE
 INITIAL_BRIGHTNESS = 0.8
 BRIGHTNESS_INCREMENT = 0.2
+ANIMATION_SPEED = 3
 
 class NeoPixelConfig:
     # Which pins the data lines of the NeoPixel strips are each connected to
@@ -77,6 +78,7 @@ class Controls:
         self.color = INITIAL_COLOR
         self.brightness = INITIAL_BRIGHTNESS
         self.counter = 0
+        self.speed = ANIMATION_SPEED
 
 async def animate_neopixels(controls):
     while True:
@@ -88,11 +90,13 @@ async def animate_neopixels(controls):
         elif controls.animation == Animation.REVOLVE:
             animate_revolve(controls, left, left_cfg)
             animate_revolve(controls, right, right_cfg)
-        controls.counter += 1
+        controls.counter += controls.speed
         await asyncio.sleep(0.1)
 
 def animate_solid(controls, leds, cfg):
-    leds[cfg.leds_to_skip + 1 : cfg.leds_to_skip + 1 + cfg.leds_in_loop ] = [controls.color] * cfg.leds_in_loop
+    start = cfg.leds_to_skip + 1
+    end = start + cfg.leds_in_loop
+    leds[start:end] = [controls.color] * cfg.leds_in_loop
     leds.show()
 
 def animate_revolve(controls, leds, cfg):
