@@ -2,7 +2,10 @@
 This sketch requires these libraries:
 - adafruit_ble
 - adafruit_bluefruit_connect
+- adafruit_register
 - asyncio
+- adafruit_max1704x.mpy
+- adafruit_ticks.mpy
 - neopixel.mpy
 Copy these from the lib folder of the bundle (for Version 9.x) zip obtained via https://circuitpython.org/libraries#:~:text=Bundle%20for%20Version%209.x
 
@@ -14,15 +17,19 @@ When you Ctrl+S to save the sketch and reload the board, you'll need to back out
 """
 
 import math
+import time
 
 import asyncio
 import board
 import neopixel
 from rainbowio import colorwheel
 
+from adafruit_max1704x import MAX17048
+
 from adafruit_ble import BLERadio
 from adafruit_ble.advertising.standard import ProvideServicesAdvertisement
 from adafruit_ble.services.nordic import UARTService
+from adafruit_ble.services.standard import BatteryService
 
 from adafruit_bluefruit_connect.packet import Packet
 from adafruit_bluefruit_connect.button_packet import ButtonPacket
@@ -74,7 +81,14 @@ right = neopixel.NeoPixel(right_cfg.data_pin, right_cfg.leds_to_skip + 1 + right
 
 ble = BLERadio()
 uart = UARTService()
-advertisement = ProvideServicesAdvertisement(uart)
+battery_service = BatteryService()
+advertisement = ProvideServicesAdvertisement(uart, battery_service)
+
+max17048 = MAX17048(board.I2C())
+battery_percent = 0
+BATTERY_CHECK_INTERVAL = 10
+# Making it think the battery was last checked 9 seconds ago, so in 1 second after power-on (enough time for the battery monitor to stabilize) it will read the value.
+last_battery_update = time.monotonic() - BATTERY_CHECK_INTERVAL + 1
 
 class Controls:
     def __init__(self):
@@ -130,6 +144,14 @@ def animate_rainbow(controls, leds, cfg):
         leds[cfg.leds_to_skip + 1 + i] = colorwheel(math.floor((i+pos)/cfg.leds_in_loop*255) & 255)
     leds.show()
 
+
+def get_battery_percentage():
+    global battery_percent, last_battery_update
+    if time.monotonic() - last_battery_update > BATTERY_CHECK_INTERVAL:
+        battery_percent = math.ceil(max17048.cell_percent)
+        last_battery_update = time.monotonic()
+    return battery_percent
+
 async def monitor_ble_control_pad(controls):
     while True:
         ble.start_advertising(advertisement)
@@ -137,6 +159,7 @@ async def monitor_ble_control_pad(controls):
             await asyncio.sleep(0)
 
         while ble.connected:
+            battery_service.level = get_battery_percentage()
             if uart.in_waiting:
                 packet = Packet.from_stream(uart)
                 if isinstance(packet, ButtonPacket):
