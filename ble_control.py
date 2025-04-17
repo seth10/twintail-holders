@@ -1,6 +1,8 @@
 """
 This sketch uses the free Adafruit Bluefruit LE Connect App. Download and open the app, check the "Must have UART Service" filter, and tap the "Connect" button next to the one device named something like "CIRCUITPYc11325".
-Then navigate to Controller > Control Pad, and use buttons 1-4 to control the brightness. 0: 0% (off), 1: 30%, 2: 70%, 3: 100%.
+Then navigate to Controller > Control Pad. Tap up or down to increase or decrease the brightness by 20% (it starts at 80%). Press 1 for red, 2 for green, 3 for blue, and 4 for teal (matches the wig).
+You can also go to Controller > Color Picker and send a custom color.
+When you Ctrl+S to save the sketch and reload the board, you'll need to back out two levels to the screen that says "Modules", before going into Controller > Control Pad again. You _don't_ need to Disconnect and re-Connect.
 """
 
 import asyncio
@@ -13,10 +15,15 @@ from adafruit_ble.services.nordic import UARTService
 
 from adafruit_bluefruit_connect.packet import Packet
 from adafruit_bluefruit_connect.button_packet import ButtonPacket
+from adafruit_bluefruit_connect.color_packet import ColorPacket
 
 # Display constants
 INITIAL_BRIGHTNESS = 0.8
+BRIGHTNESS_INCREMENT = 0.2
 RED = (255, 0, 0)
+GREEN = (0, 255, 0)
+BLUE = (0, 0, 255)
+TEAL = (0, 255, 126)
 BLACK = (0, 0, 0)
 
 class NeoPixelConfig:
@@ -71,14 +78,20 @@ async def monitor_ble_control_pad(controls):
                 packet = Packet.from_stream(uart)
                 if isinstance(packet, ButtonPacket):
                     if packet.pressed:
-                        if packet.button == ButtonPacket.BUTTON_1:
-                            controls.brightness = 0.0
+                        if packet.button == ButtonPacket.UP:
+                            controls.brightness = min(controls.brightness + BRIGHTNESS_INCREMENT, 1.0)
+                        elif packet.button == ButtonPacket.DOWN:
+                            controls.brightness = max(controls.brightness - BRIGHTNESS_INCREMENT, 0.0)
+                        elif packet.button == ButtonPacket.BUTTON_1:
+                            controls.color = RED
                         elif packet.button == ButtonPacket.BUTTON_2:
-                            controls.brightness = 0.3
+                            controls.color = GREEN
                         elif packet.button == ButtonPacket.BUTTON_3:
-                            controls.brightness = 0.7
+                            controls.color = BLUE
                         elif packet.button == ButtonPacket.BUTTON_4:
-                            controls.brightness = 1.0
+                            controls.color = TEAL
+                if isinstance(packet, ColorPacket):
+                    controls.color = packet.color
             await asyncio.sleep(0)
 
         # If we got here, we lost the connection. Go up to the top of this function and start advertising again, waiting for a connection.
