@@ -7,11 +7,11 @@ This sketch requires these libraries:
 - adafruit_max1704x.mpy
 - adafruit_ticks.mpy
 - neopixel.mpy
-Copy these from the lib folder of the bundle (for Version 9.x) zip obtained via https://circuitpython.org/libraries#:~:text=Bundle%20for%20Version%209.x
+Copy these from the lib folder of the bundle (for Version 10.x) zip obtained via https://circuitpython.org/libraries#:~:text=Bundle%20for%20Version%2010.x
 
 This project uses the free Adafruit Bluefruit LE Connect App. Download and open the app, check the "Must have UART Service" filter, and tap the "Connect" button next to the one device named something like "CIRCUITPYc11325".
 Then navigate to Controller > Control Pad. The numbers control the animation. Press 1 for a solid color, 2 for a revolving pattern, 3 for a wiping pattern, and 4 for a rainbow swirl.
-Tap up or down to increase or decrease the brightness by 20% (it starts at 80%). Tap left or right to decrease or increase the speed (it starts at 1, and can go up to 4).
+Tap up or down to increase or decrease the brightness by 20% (it starts at 20%). Tap left or right to decrease or increase the speed (it starts at 1, and can go up to 4).
 You can go to Controller > Color Picker to set the color of animations 1-3 (it starts as red).
 When you Ctrl+S to save the sketch and reload the board, you'll need to back out two levels to the screen that says "Modules", before going into Controller > Control Pad again. You _don't_ need to Disconnect and re-Connect.
 """
@@ -53,11 +53,13 @@ TEAL = (0, 255, 126)
 BLACK = (0, 0, 0)
 
 # Display constants
-INITIAL_ANIMATION = Animation.WIPE
+INITIAL_ANIMATION = Animation.RAINBOW
 INITIAL_COLOR = RED
-INITIAL_BRIGHTNESS = 0.8
+INITIAL_BRIGHTNESS = 0.2
 BRIGHTNESS_INCREMENT = 0.2
 ANIMATION_SPEED = 1
+
+ADVERTISING_RESTART_TIME = 60*10 # 10 minutes, in seconds
 
 class NeoPixelConfig:
     # Which pins the data lines of the NeoPixel strips are each connected to
@@ -66,7 +68,7 @@ class NeoPixelConfig:
     leds_to_skip: int
     # How many LEDs are actually part of the accessory
     leds_in_loop: int
-    
+
     def __init__(self, data_pin, leds_to_skip, leds_in_loop):
         self.data_pin = data_pin
         self.leds_to_skip = leds_to_skip
@@ -163,12 +165,26 @@ def get_battery_percentage():
 
 async def monitor_ble_control_pad(controls):
     while True:
-        ble.start_advertising(advertisement)
+        # Start advertising
+        if not ble.advertising:
+            ble.start_advertising(advertisement, timeout=None)
+
+        last_advertise_restart = time.monotonic()
+
+        # Wait for a connection
         while not ble.connected:
-            await asyncio.sleep(0)
+            if time.monotonic() - last_advertise_restart > ADVERTISING_RESTART_TIME:
+                ble.stop_advertising()
+                ble.start_advertising(advertisement, timeout=None)
+                last_advertise_restart = time.monotonic()
+            await asyncio.sleep(0.1)
+
+        # Connected: stop advertising
+        if ble.advertising:
+            ble.stop_advertising()
 
         while ble.connected:
-            battery_service.level = get_battery_percentage()
+            battery_service.level = max(0, min(100, int(get_battery_percentage())))
             if uart.in_waiting:
                 packet = Packet.from_stream(uart)
                 if isinstance(packet, ButtonPacket):
@@ -191,16 +207,18 @@ async def monitor_ble_control_pad(controls):
                             controls.animation = Animation.RAINBOW
                 if isinstance(packet, ColorPacket):
                     controls.color = packet.color
-            await asyncio.sleep(0)
+            await asyncio.sleep(0.01)
 
         # If we got here, we lost the connection. Go up to the top of this function and start advertising again, waiting for a connection.
+        # Brief cooldown after disconnect before re-advertising
+        await asyncio.sleep(1)
 
 async def main():
     controls = Controls()
 
     ble_task = asyncio.create_task(monitor_ble_control_pad(controls))
     neopixel_task = asyncio.create_task(animate_neopixels(controls))
-    
+
     # This will run forever, because no tasks ever finish.
     await asyncio.gather(ble_task, neopixel_task)
 
